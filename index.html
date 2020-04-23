@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  width: 960px;
+  height: 500px;
+  position: relative;
+}
+
+#map-container {
+    height: 500px;
+    width: 500px;
+}
+
+.states {
+    fill: grey;
+    stroke: black;
+    stroke-linejoin: round;
+}
+
+#map {
+  overflow: visible;
+}
+
+</style>
+<body>
+    <div id="click_to_run" onclick="doUpdate()">Clique aqui para visualizar</div>
+    <div id="map-container"></div>
+</body>
+<script src="https://d3js.org/d3.v3.min.js"></script>
+<script src="https://d3js.org/topojson.v1.min.js"></script>
+<script src="cartogram.js"></script>
+<script>
+var map = d3.select("#map-container")
+            .append('svg')
+            .attr("id", "map");
+
+var topo,
+    covidData;
+
+var edos = map.append("g")
+    .attr("id", "edos")
+    .selectAll("path");
+
+var proj =  d3.geo.mercator()
+  .center([-40, -10])
+  .scale(600);
+
+var carto = d3.cartogram()
+    .projection(proj)
+    .properties(function (d) {
+        return d.properties;
+    });
+
+var topology, geometry;
+
+function makeMap (data) {
+    topology = data;
+    geometries = data.objects.states.geometries;
+    var features = carto.features(data, geometries),
+        path = d3.geo.path()
+            .projection(proj);
+
+    edos = edos.data(features)
+        .enter()
+        .append("path")
+        .attr("class", "states")
+        .attr("id", function (d) {
+            return d.properties.name;
+        })
+        .attr("d", path);
+};
+
+function doUpdate () {
+  var scale = d3.scale.linear()
+          .domain([0, 17000000])
+          .range([1, 10000]);
+  carto.value(function (d) {
+    let amount = getAmount(d);
+    //console.log(d.id, amount);
+    return scale(amount);
+  });
+
+  var carto_features = carto(topology, geometries).features;
+  edos.data(carto_features);
+
+  edos.transition()
+      .duration(900)
+      .attr("d", carto.path);
+};
+
+function getAmount(d) {
+    var filtered = covidData.filter(function (e) {
+        return e.estado == d.id;
+    });
+    //console.log("Get Amount - filtered", filtered);
+    return filtered[0].casosAcumulados;
+};
+
+d3.json("br-states.json", function (data) {
+    makeMap(data)
+});
+
+d3.csv("covid.csv", function(dataset) {
+    covidData = dataset;
+    //console.log("Covid", covidData);
+});
+
+</script>
